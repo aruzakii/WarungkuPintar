@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "621781213807",
+    "project_id": "warungkupintar-e5867",
+    "storage_bucket": "warungkupintar-e5867.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:621781213807:android:75f25b95573110ee0c239a",
+        "android_client_info": {
+          "package_name": "com.example.umkm_smart_assistant"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "621781213807-tp47t6temovb85vcav93oi43uvgfut8e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCqCQuVEurY0PuxGiA0_E7hGtAKNOnbrv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "621781213807-tp47t6temovb85vcav93oi43uvgfut8e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "621781213807-4vc52ggbgmej44t7vqa3dllqsig885ac.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.umkmSmartAssistant"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
