@@ -71,7 +71,6 @@ class _CashierScreenState extends State<CashierScreen> {
           sellPrice: 0,
           barcode: '',
           category: '',
-          prediction: '',
           stockPrediction: '',
           unit: '',
         ),

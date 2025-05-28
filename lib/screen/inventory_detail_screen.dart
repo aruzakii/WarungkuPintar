@@ -180,9 +180,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         sellPrice: double.parse(_sellPriceController.text),
         barcode: widget.item.barcode,
         category: _selectedCategory,
-        prediction: widget.item.prediction,
         stockPrediction: widget.item.stockPrediction,
-        imageUrl: widget.item.imageUrl,
         unit: _selectedUnit,
       );
 

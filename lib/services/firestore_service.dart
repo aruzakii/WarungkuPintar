@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../model/cashier_model.dart';
 import '../model/item_model.dart';
 import '../model/sale_model.dart';
-import '../services/ai_service.dart';
+import '../services/kategorisasi_service.dart';
 import '../services/prediction_service.dart';
 import '../provider/inventory_provider.dart';
 
@@ -14,7 +14,7 @@ class FirestoreService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('User not logged in');
 
-    final predictedCategory = await AIService.predictCategory(item.name ?? '');
+    final predictedCategory = await KategorisasiService.predictCategory(item.name ?? '');
     final barcodeValue =
         '${item.name}-$userId-${DateTime.now().millisecondsSinceEpoch}'; // Barcode unik
     final itemWithCategory = Item(
@@ -24,9 +24,7 @@ class FirestoreService {
       sellPrice: item.sellPrice,
       barcode: barcodeValue,
       category: predictedCategory,
-      prediction: 'Diprediksi oleh AI (Google Cloud NLP)',
       stockPrediction: null,
-      imageUrl: item.imageUrl,
       unit: item.unit,
     );
 
@@ -72,8 +70,8 @@ class FirestoreService {
         .collection('inventory')
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Item.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((doc) => Item.fromMap(doc.data(), doc.id))
+        .toList());
   }
 
   Stream<List<Sale>> getSales(String userId) {
@@ -83,8 +81,8 @@ class FirestoreService {
         .collection('sales')
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Sale.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((doc) => Sale.fromMap(doc.data(), doc.id))
+        .toList());
   }
 
   Future<void> createSale(String userId, Sale sale) async {

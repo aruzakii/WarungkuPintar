@@ -33,9 +33,7 @@ class InventoryProvider with ChangeNotifier {
       sellPrice: sellPrice,
       barcode: "BRG-${DateTime.now().millisecondsSinceEpoch}",
       category: category,
-      prediction: 'Diprediksi oleh AI (Google Cloud NLP)',
       stockPrediction: null,
-      imageUrl: null,
       unit: unit,
     );
 
@@ -56,7 +54,7 @@ class InventoryProvider with ChangeNotifier {
 
     await _firestoreService.updateItem(userId, item);
     final index =
-        _items.indexWhere((existingItem) => existingItem.docId == item.docId);
+    _items.indexWhere((existingItem) => existingItem.docId == item.docId);
     if (index != -1) {
       final updatedItem = Item(
         docId: item.docId,
@@ -66,10 +64,8 @@ class InventoryProvider with ChangeNotifier {
         sellPrice: item.sellPrice,
         barcode: item.barcode,
         category: item.category,
-        prediction: item.prediction,
         stockPrediction: predictStockForItem(item),
         // Update prediksi stok
-        imageUrl: item.imageUrl,
         unit: item.unit,
       );
       _items[index] = updatedItem;
@@ -117,9 +113,7 @@ class InventoryProvider with ChangeNotifier {
             sellPrice: item.sellPrice,
             barcode: item.barcode,
             category: item.category,
-            prediction: item.prediction,
             stockPrediction: predictStockForItem(item),
-            imageUrl: item.imageUrl,
             unit: item.unit,
           );
           if (!uniqueItems
@@ -155,9 +149,7 @@ class InventoryProvider with ChangeNotifier {
             sellPrice: item.sellPrice,
             barcode: item.barcode,
             category: item.category,
-            prediction: item.prediction,
             stockPrediction: predictStockForItem(item),
-            imageUrl: item.imageUrl,
             unit: item.unit,
           );
         }).toList();
@@ -174,10 +166,10 @@ class InventoryProvider with ChangeNotifier {
     final now = DateTime.now();
     return _sales
         .where((sale) =>
-            sale.date != null &&
-            sale.date!.day == now.day &&
-            sale.date!.month == now.month &&
-            sale.date!.year == now.year)
+    sale.date != null &&
+        sale.date!.day == now.day &&
+        sale.date!.month == now.month &&
+        sale.date!.year == now.year)
         .fold(0, (total, sale) => total + (sale.totalPrice ?? 0));
   }
 
@@ -214,10 +206,8 @@ class InventoryProvider with ChangeNotifier {
         sellPrice: item.sellPrice,
         barcode: item.barcode,
         category: item.category,
-        prediction: item.prediction,
         stockPrediction: predictStockForItem(item),
         // Update prediksi
-        imageUrl: item.imageUrl,
         unit: item.unit,
       );
 
@@ -255,9 +245,7 @@ class InventoryProvider with ChangeNotifier {
           sellPrice: item.sellPrice,
           barcode: item.barcode,
           category: item.category,
-          prediction: item.prediction,
           stockPrediction: predictStockForItem(item),
-          imageUrl: item.imageUrl,
           unit: item.unit,
         );
         if (!uniqueItems
@@ -286,9 +274,7 @@ class InventoryProvider with ChangeNotifier {
           sellPrice: item.sellPrice,
           barcode: item.barcode,
           category: item.category,
-          prediction: item.prediction,
           stockPrediction: predictStockForItem(item),
-          imageUrl: item.imageUrl,
           unit: item.unit,
         );
       }).toList();

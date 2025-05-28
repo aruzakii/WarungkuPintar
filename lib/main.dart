@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:umkm_smart_assistant/services/prediction_service.dart';
 import 'provider/inventory_provider.dart';
 import 'screen/main_screen.dart';
 import 'screen/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // await PredictionService.loadModel();
   await Firebase.initializeApp();
   runApp(const MyApp());
 }

@@ -7,9 +7,7 @@ class Item {
   final double? sellPrice;
   final String? barcode;
   final String? category;
-  final String? prediction;
   final String? stockPrediction;
-  final String? imageUrl;
   final String? unit; // Tambah field buat satuan (contoh: "Liter (L)", "Kilogram (kg)", "Pcs/Buah")
   // final String? barcodePath;
 
@@ -21,9 +19,7 @@ class Item {
     this.sellPrice,
     this.barcode,
     this.category,
-    this.prediction,
     this.stockPrediction,
-    this.imageUrl,
     this.unit, // Tambah parameter unit
     // this.barcodePath,
   });
@@ -36,9 +32,7 @@ class Item {
       'sell_price': sellPrice,
       'barcode': barcode,
       'category': category ?? 'lainnya',
-      'prediction': prediction ?? 'Belum diprediksi',
       'stock_prediction': stockPrediction,
-      'image_url': imageUrl,
       'unit': unit ?? 'Pcs/Buah', // Default ke "Pcs/Buah" kalau null
       // 'barcode_path': barcodePath,
     };
@@ -53,9 +47,7 @@ class Item {
       sellPrice: (map['sell_price'] as num?)?.toDouble(),
       barcode: map['barcode'] as String?,
       category: map['category'] as String?,
-      prediction: map['prediction'] as String?,
       stockPrediction: map['stock_prediction'] as String?,
-      imageUrl: map['image_url'] as String?,
       unit: map['unit'] as String?, // Ambil satuan dari Firestore
       // barcodePath: map['barcode_path'] as String?,
     );

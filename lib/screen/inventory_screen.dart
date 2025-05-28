@@ -4,7 +4,7 @@ import 'package:lottie/lottie.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../provider/inventory_provider.dart';
 import '../model/item_model.dart';
-import '../services/ai_service.dart';
+import '../services/kategorisasi_service.dart';
 import 'inventory_detail_screen.dart';
 import 'dart:async';
 
@@ -63,7 +63,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       final name = _nameController.text;
       if (name.isNotEmpty) {
-        final predictedCategory = await AIService.predictCategory(name);
+        final predictedCategory = await KategorisasiService.predictCategory(name);
         final normalizedCategory = _categories.contains(predictedCategory)
             ? predictedCategory
             : 'Lainnya';
