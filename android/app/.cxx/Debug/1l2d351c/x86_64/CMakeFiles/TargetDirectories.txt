@@ -1,0 +1,2 @@
+/Users/fahrel/semester8/Skripsi/WarungkuPintar/android/app/.cxx/Debug/1l2d351c/x86_64/CMakeFiles/edit_cache.dir
+/Users/fahrel/semester8/Skripsi/WarungkuPintar/android/app/.cxx/Debug/1l2d351c/x86_64/CMakeFiles/rebuild_cache.dir

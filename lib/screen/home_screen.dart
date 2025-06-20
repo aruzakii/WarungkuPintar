@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart'; // Untuk format tanggal
+import 'package:intl/intl.dart';
 import '../provider/inventory_provider.dart';
 import '../model/sale_model.dart';
 
@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
-  String _selectedPeriod = 'Mingguan'; // Default: Mingguan
+  String _selectedPeriod = 'Mingguan';
   final List<String> _periods = ['Harian', 'Mingguan', 'Bulanan', 'Tahunan'];
   DateTime? _startDate;
   DateTime? _endDate;
@@ -24,9 +24,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // Warna dari logo WarungkuPintar
   final Color primaryColor = const Color(0xFF2E7D32); // Hijau tua
   final Color secondaryColor = const Color(0xFFFBC02D); // Kuning
+  final Color touchedColor = Colors.blueAccent; // Warna saat bar disentuh
 
   // State untuk melacak bar yang disentuh
   int? _touchedGroupIndex;
+  int? _touchedRodIndex; // 0 untuk Penjualan, 1 untuk Keuntungan
 
   @override
   void initState() {
@@ -37,10 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     final provider = Provider.of<InventoryProvider>(context, listen: false);
-
     provider.loadItems();
     provider.loadSales();
-    // Tambah delay untuk memastikan data dari Firestore sudah masuk
     await Future.delayed(const Duration(milliseconds: 500));
     setState(() => _isLoading = false);
   }
@@ -90,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Fungsi untuk format Rupiah dengan pemisah ribuan
   String _formatRupiah(double value) {
     final formatter = NumberFormat.currency(
       locale: 'id_ID',
@@ -100,7 +99,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return formatter.format(value);
   }
 
-  // Fungsi untuk format label sumbu Y dengan istilah Indonesia
   String _formatLabelY(double value) {
     if (value >= 1000000000000) {
       return '${(value / 1000000000000).toStringAsFixed(1)}T';
@@ -115,19 +113,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  List<BarChartGroupData> _getSalesTrend(InventoryProvider provider) {
+  List<BarChartGroupData> _getSalesAndProfitTrend(InventoryProvider provider) {
     final now = DateTime.now();
     final defaultStart = now.subtract(const Duration(days: 30));
     final start = _startDate ?? defaultStart;
     final end = _endDate ?? now;
 
-    // Pastikan start tidak lebih besar dari end
     if (start.isAfter(end)) {
       return [];
     }
 
-    // Tentukan periode dan kelompokkan data
     final salesByPeriod = <String, double>{};
+    final profitByPeriod = <String, double>{};
     final barGroups = <BarChartGroupData>[];
     int groupCount;
     List<DateTime> periodDates = [];
@@ -141,16 +138,16 @@ class _HomeScreenState extends State<HomeScreen> {
           periodDates.add(currentDate);
           final key = DateFormat('yyyy-MM-dd').format(currentDate);
           salesByPeriod[key] = 0;
+          profitByPeriod[key] = 0;
         }
         for (var sale in provider.sales) {
           if (sale.date != null &&
               sale.date!.isAfter(start.subtract(const Duration(days: 1))) &&
               sale.date!.isBefore(end.add(const Duration(days: 1)))) {
-            final saleDate =
-                DateTime(sale.date!.year, sale.date!.month, sale.date!.day);
+            final saleDate = DateTime(sale.date!.year, sale.date!.month, sale.date!.day);
             final key = DateFormat('yyyy-MM-dd').format(saleDate);
-            salesByPeriod[key] =
-                (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            salesByPeriod[key] = (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            profitByPeriod[key] = (profitByPeriod[key] ?? 0) + provider.calculateSaleProfit(sale);
           }
         }
         break;
@@ -164,20 +161,20 @@ class _HomeScreenState extends State<HomeScreen> {
           periodDates.add(weekStart);
           final key = DateFormat('yyyy-MM-dd').format(weekStart);
           salesByPeriod[key] = 0;
+          profitByPeriod[key] = 0;
         }
         for (var sale in provider.sales) {
           if (sale.date != null &&
               sale.date!.isAfter(start.subtract(const Duration(days: 1))) &&
               sale.date!.isBefore(end.add(const Duration(days: 1)))) {
-            final saleDate =
-                DateTime(sale.date!.year, sale.date!.month, sale.date!.day);
+            final saleDate = DateTime(sale.date!.year, sale.date!.month, sale.date!.day);
             final daysSinceStart = saleDate.difference(start).inDays;
             final weekIndex = (daysSinceStart / 7).floor();
             final weekStart = start.add(Duration(days: weekIndex * 7));
             if (weekStart.isAfter(end)) continue;
             final key = DateFormat('yyyy-MM-dd').format(weekStart);
-            salesByPeriod[key] =
-                (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            salesByPeriod[key] = (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            profitByPeriod[key] = (profitByPeriod[key] ?? 0) + provider.calculateSaleProfit(sale);
           }
         }
         break;
@@ -186,16 +183,16 @@ class _HomeScreenState extends State<HomeScreen> {
         final startMonth = DateTime(start.year, start.month, 1);
         final endMonth = DateTime(end.year, end.month, 1);
         groupCount = ((endMonth.year - startMonth.year) * 12 +
-                endMonth.month -
-                startMonth.month) +
+            endMonth.month -
+            startMonth.month) +
             1;
         for (int i = 0; i < groupCount; i++) {
-          final currentMonth =
-              DateTime(startMonth.year, startMonth.month + i, 1);
+          final currentMonth = DateTime(startMonth.year, startMonth.month + i, 1);
           if (currentMonth.isAfter(endMonth)) break;
           periodDates.add(currentMonth);
           final key = DateFormat('yyyy-MM').format(currentMonth);
           salesByPeriod[key] = 0;
+          profitByPeriod[key] = 0;
         }
         for (var sale in provider.sales) {
           if (sale.date != null &&
@@ -203,8 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
               sale.date!.isBefore(end.add(const Duration(days: 1)))) {
             final saleDate = DateTime(sale.date!.year, sale.date!.month, 1);
             final key = DateFormat('yyyy-MM').format(saleDate);
-            salesByPeriod[key] =
-                (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            salesByPeriod[key] = (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            profitByPeriod[key] = (profitByPeriod[key] ?? 0) + provider.calculateSaleProfit(sale);
           }
         }
         break;
@@ -219,6 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
           periodDates.add(currentYear);
           final key = DateFormat('yyyy').format(currentYear);
           salesByPeriod[key] = 0;
+          profitByPeriod[key] = 0;
         }
         for (var sale in provider.sales) {
           if (sale.date != null &&
@@ -226,8 +224,8 @@ class _HomeScreenState extends State<HomeScreen> {
               sale.date!.isBefore(end.add(const Duration(days: 1)))) {
             final saleDate = DateTime(sale.date!.year, 1, 1);
             final key = DateFormat('yyyy').format(saleDate);
-            salesByPeriod[key] =
-                (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            salesByPeriod[key] = (salesByPeriod[key] ?? 0) + (sale.totalPrice ?? 0);
+            profitByPeriod[key] = (profitByPeriod[key] ?? 0) + provider.calculateSaleProfit(sale);
           }
         }
         break;
@@ -236,7 +234,6 @@ class _HomeScreenState extends State<HomeScreen> {
         groupCount = 0;
     }
 
-    // Buat bar chart untuk setiap grup
     for (int i = 0; i < periodDates.length; i++) {
       final date = periodDates[i];
       String key;
@@ -257,15 +254,20 @@ class _HomeScreenState extends State<HomeScreen> {
           key = '';
       }
       final sales = salesByPeriod[key] ?? 0;
+      final profit = profitByPeriod[key] ?? 0;
       barGroups.add(
         BarChartGroupData(
           x: i,
           barRods: [
             BarChartRodData(
               toY: sales,
-              color: _touchedGroupIndex == i
-                  ? secondaryColor // Highlight dengan warna kuning saat disentuh
-                  : primaryColor, // Warna default (hijau tua)
+              color: (_touchedGroupIndex == i && _touchedRodIndex == 0) ? touchedColor : primaryColor,
+              width: 16,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            BarChartRodData(
+              toY: profit,
+              color: (_touchedGroupIndex == i && _touchedRodIndex == 1) ? touchedColor : secondaryColor,
               width: 16,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -281,7 +283,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<InventoryProvider>(
       builder: (context, provider, child) {
-        // Hitung lebar chart berdasarkan jumlah grup
         int groupCount;
         double labelInterval;
         final now = DateTime.now();
@@ -303,8 +304,8 @@ class _HomeScreenState extends State<HomeScreen> {
             final startMonth = DateTime(start.year, start.month, 1);
             final endMonth = DateTime(end.year, end.month, 1);
             groupCount = ((endMonth.year - startMonth.year) * 12 +
-                    endMonth.month -
-                    startMonth.month) +
+                endMonth.month -
+                startMonth.month) +
                 1;
             labelInterval = groupCount > 5 ? 3 : 1;
             break;
@@ -318,19 +319,17 @@ class _HomeScreenState extends State<HomeScreen> {
             groupCount = 7;
             labelInterval = 1;
         }
-        final chartWidth = groupCount * 70.0; // Lebar per grup 70 piksel
+        final chartWidth = groupCount * 70.0;
 
-        // Hitung nilai maksimum untuk sumbu Y dari data penjualan
         double rawMaxY = 0;
-        final barGroups = _getSalesTrend(provider);
+        final barGroups = _getSalesAndProfitTrend(provider);
         if (barGroups.isNotEmpty) {
           rawMaxY = barGroups
-              .map((group) => group.barRods[0].toY)
+              .expand((group) => group.barRods.map((rod) => rod.toY))
               .reduce((a, b) => a > b ? a : b);
         }
         rawMaxY = rawMaxY == 0 ? 10000.0 : rawMaxY;
 
-        // Bulatkan maxY ke kelipatan tertentu untuk skala yang rapi
         double maxY;
         if (rawMaxY <= 10000) {
           maxY = (rawMaxY / 1000).ceil() * 1000;
@@ -341,11 +340,8 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           maxY = (rawMaxY / 500000).ceil() * 500000;
         }
-
-        // Tambah padding atas 40% agar bar tidak menempel pada batas atas
         maxY = maxY * 1.4;
 
-        // Tentukan jumlah label sumbu Y (misalnya 5 label)
         const int yLabelCount = 5;
         final yInterval = maxY / (yLabelCount - 1);
 
@@ -353,342 +349,377 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(16.0),
           child: _isLoading
               ? Center(
-                  child: Lottie.asset(
-                    'assets/loading.json',
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                )
+            child: Lottie.asset(
+              'assets/loading.json',
+              width: 100,
+              height: 100,
+              fit: BoxFit.cover,
+            ),
+          )
               : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Card(
                         elevation: 4,
                         child: Padding(
-                          padding: const EdgeInsets.all(16.0),
+                          padding: const EdgeInsets.all(12.0),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                "Penjualan Hari Ini",
+                                "Penjualan",
                                 style: TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold),
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 _formatRupiah(provider.todaySales),
                                 style: TextStyle(
-                                    fontSize: 24, color: primaryColor),
+                                    fontSize: 20, color: primaryColor),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Card(
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Card(
                         elevation: 4,
                         child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Dari",
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  GestureDetector(
-                                    onTap: () => _selectDate(context, true),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8, horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(color: primaryColor),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _startDate != null
-                                            ? DateFormat('dd/MM/yyyy')
-                                                .format(_startDate!)
-                                            : 'Pilih Tanggal',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: _startDate != null
-                                              ? Colors.black
-                                              : Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Sampai",
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  GestureDetector(
-                                    onTap: () => _selectDate(context, false),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8, horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        border: Border.all(color: primaryColor),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _endDate != null
-                                            ? DateFormat('dd/MM/yyyy')
-                                                .format(_endDate!)
-                                            : 'Pilih Tanggal',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: _endDate != null
-                                              ? Colors.black
-                                              : Colors.grey,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Card(
-                        elevation: 4,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0, vertical: 8.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          padding: const EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                "Periode:",
+                                "Keuntungan",
                                 style: TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w500),
+                                    fontSize: 16, fontWeight: FontWeight.bold),
                               ),
-                              DropdownButton<String>(
-                                value: _selectedPeriod,
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _selectedPeriod = newValue!;
-                                  });
-                                },
-                                items: _periods.map<DropdownMenuItem<String>>(
-                                    (String value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                }).toList(),
+                              const SizedBox(height: 6),
+                              Text(
+                                _formatRupiah(provider.todayProfit),
+                                style: TextStyle(
+                                    fontSize: 20, color: secondaryColor),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "Tren Penjualan",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 200,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(
-                              width: 40,
-                              child: Column(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: List.generate(yLabelCount, (index) {
-                                  final value =
-                                      yInterval * (yLabelCount - 1 - index);
-                                  String label = _formatLabelY(value);
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Text(
-                                      label,
-                                      style: const TextStyle(fontSize: 10),
-                                      textAlign: TextAlign.end,
-                                    ),
-                                  );
-                                }),
-                              ),
+                            const Text(
+                              "Dari",
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w500),
                             ),
-                            Expanded(
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: SizedBox(
-                                  width: chartWidth + 100, // Padding kanan
-                                  child: BarChart(
-                                    BarChartData(
-                                      maxY: maxY,
-                                      barGroups: barGroups,
-                                      borderData: FlBorderData(show: false),
-                                      titlesData: FlTitlesData(
-                                        show: true,
-                                        bottomTitles: AxisTitles(
-                                          sideTitles: SideTitles(
-                                            showTitles: true,
-                                            getTitlesWidget: (value, meta) {
-                                              final index = value.toInt();
-                                              final date =
-                                                  _getDateForIndex(index);
-                                              String label;
-                                              switch (_selectedPeriod) {
-                                                case 'Harian':
-                                                  label =
-                                                      '${date.day}/${date.month}';
-                                                  break;
-                                                case 'Mingguan':
-                                                  label =
-                                                      '${date.day}/${date.month}';
-                                                  break;
-                                                case 'Bulanan':
-                                                  label = DateFormat('MMM')
-                                                      .format(date);
-                                                  break;
-                                                case 'Tahunan':
-                                                  label = '${date.year}';
-                                                  break;
-                                                default:
-                                                  label = '';
-                                              }
-                                              return Text(
-                                                label,
-                                                style: const TextStyle(
-                                                    fontSize: 10),
-                                                textAlign: TextAlign.center,
-                                              );
-                                            },
-                                            reservedSize: 30,
-                                            interval: labelInterval,
-                                          ),
-                                        ),
-                                        leftTitles: const AxisTitles(
-                                          sideTitles:
-                                              SideTitles(showTitles: false),
-                                        ),
-                                        topTitles: const AxisTitles(
-                                          sideTitles:
-                                              SideTitles(showTitles: false),
-                                        ),
-                                        rightTitles: const AxisTitles(
-                                          sideTitles:
-                                              SideTitles(showTitles: false),
-                                        ),
-                                      ),
-                                      gridData: FlGridData(show: false),
-                                      barTouchData: BarTouchData(
-                                        enabled: true,
-                                        handleBuiltInTouches: true,
-                                        touchExtraThreshold:
-                                            const EdgeInsets.only(
-                                          left: 20,
-                                          right: 30,
-                                          top: 20,
-                                          bottom: 20,
-                                        ),
-                                        touchCallback: (FlTouchEvent event,
-                                            barTouchResponse) {
-                                          setState(() {
-                                            if (!event
-                                                    .isInterestedForInteractions ||
-                                                barTouchResponse == null ||
-                                                barTouchResponse.spot == null) {
-                                              _touchedGroupIndex = null;
-                                              return;
-                                            }
-                                            _touchedGroupIndex =
-                                                barTouchResponse
-                                                    .spot!.touchedBarGroupIndex;
-                                            final sales =
-                                                barGroups[_touchedGroupIndex!]
-                                                    .barRods[0]
-                                                    .toY;
-                                            print(
-                                                'Touched bar index: $_touchedGroupIndex, Sales: $sales');
-                                          });
-                                        },
-                                        touchTooltipData: BarTouchTooltipData(
-                                          getTooltipColor: (_) => primaryColor,
-                                          tooltipMargin: 10,
-                                          tooltipPadding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 8, vertical: 4),
-                                          getTooltipItem: (group, groupIndex,
-                                              rod, rodIndex) {
-                                            print(
-                                                'Tooltip for groupIndex: $groupIndex, value: ${rod.toY}');
-                                            return BarTooltipItem(
-                                              _formatRupiah(rod.toY),
-                                              // Gunakan format Rupiah lengkap
-                                              const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
+                            const SizedBox(height: 4),
+                            GestureDetector(
+                              onTap: () => _selectDate(context, true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: primaryColor),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _startDate != null
+                                      ? DateFormat('dd/MM/yyyy').format(_startDate!)
+                                      : 'Pilih Tanggal',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _startDate != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "Stok Kritis",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      provider.criticalStock.isEmpty
-                          ? const Center(child: Text("Tidak ada stok kritis"))
-                          : SizedBox(
-                              height: 200,
-                              child: ListView.builder(
-                                itemCount: provider.criticalStock.length,
-                                itemBuilder: (context, index) {
-                                  final item = provider.criticalStock[index];
-                                  return ListTile(
-                                    title: Text(item.name ?? ''),
-                                    subtitle: Text(
-                                      "Sisa: ${item.quantity ?? 0} ${item.stockPrediction != null ? '- ${item.stockPrediction}' : ''}",
-                                    ),
-                                    trailing: const Icon(
-                                      Icons.warning,
-                                      color: Colors.red,
-                                    ),
-                                  );
-                                },
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Sampai",
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 4),
+                            GestureDetector(
+                              onTap: () => _selectDate(context, false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: primaryColor),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _endDate != null
+                                      ? DateFormat('dd/MM/yyyy').format(_endDate!)
+                                      : 'Pilih Tanggal',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _endDate != null
+                                        ? Colors.black
+                                        : Colors.grey,
+                                  ),
+                                ),
                               ),
                             ),
-                      const SizedBox(height: 16),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Periode:",
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w500),
+                        ),
+                        DropdownButton<String>(
+                          value: _selectedPeriod,
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedPeriod = newValue!;
+                            });
+                          },
+                          items: _periods
+                              .map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Tren Penjualan & Keuntungan",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Penjualan', style: TextStyle(fontSize: 14)),
+                    const SizedBox(width: 16),
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: secondaryColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Keuntungan', style: TextStyle(fontSize: 14)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 200,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        width: 40,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: List.generate(yLabelCount, (index) {
+                            final value = yInterval * (yLabelCount - 1 - index);
+                            String label = _formatLabelY(value);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: Text(
+                                label,
+                                style: const TextStyle(fontSize: 10),
+                                textAlign: TextAlign.end,
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: chartWidth + 100,
+                            child: BarChart(
+                              BarChartData(
+                                maxY: maxY,
+                                barGroups: barGroups,
+                                borderData: FlBorderData(show: false),
+                                titlesData: FlTitlesData(
+                                  show: true,
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      getTitlesWidget: (value, meta) {
+                                        final index = value.toInt();
+                                        final date = _getDateForIndex(index);
+                                        String label;
+                                        switch (_selectedPeriod) {
+                                          case 'Harian':
+                                            label = '${date.day}/${date.month}';
+                                            break;
+                                          case 'Mingguan':
+                                            label = '${date.day}/${date.month}';
+                                            break;
+                                          case 'Bulanan':
+                                            label = DateFormat('MMM').format(date);
+                                            break;
+                                          case 'Tahunan':
+                                            label = '${date.year}';
+                                            break;
+                                          default:
+                                            label = '';
+                                        }
+                                        return Text(
+                                          label,
+                                          style: const TextStyle(fontSize: 10),
+                                          textAlign: TextAlign.center,
+                                        );
+                                      },
+                                      reservedSize: 30,
+                                      interval: labelInterval,
+                                    ),
+                                  ),
+                                  leftTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                ),
+                                gridData: FlGridData(show: false),
+                                barTouchData: BarTouchData(
+                                  enabled: true,
+                                  handleBuiltInTouches: true,
+                                  touchExtraThreshold: const EdgeInsets.only(
+                                    left: 20,
+                                    right: 30,
+                                    top: 20,
+                                    bottom: 20,
+                                  ),
+                                  touchCallback: (FlTouchEvent event, barTouchResponse) {
+                                    setState(() {
+                                      if (!event.isInterestedForInteractions ||
+                                          barTouchResponse == null ||
+                                          barTouchResponse.spot == null) {
+                                        _touchedGroupIndex = null;
+                                        _touchedRodIndex = null;
+                                        return;
+                                      }
+                                      _touchedGroupIndex =
+                                          barTouchResponse.spot!.touchedBarGroupIndex;
+                                      _touchedRodIndex =
+                                          barTouchResponse.spot!.touchedRodDataIndex;
+                                      final sales = barGroups[_touchedGroupIndex!].barRods[0].toY;
+                                      final profit = barGroups[_touchedGroupIndex!].barRods[1].toY;
+                                      print('Touched bar index: $_touchedGroupIndex, Rod index: $_touchedRodIndex, Sales: $sales, Profit: $profit');
+                                    });
+                                  },
+                                  touchTooltipData: BarTouchTooltipData(
+                                    getTooltipColor: (_) => primaryColor,
+                                    tooltipMargin: 10,
+                                    tooltipPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                      final label = rodIndex == 0 ? 'Penjualan' : 'Keuntungan';
+                                      return BarTooltipItem(
+                                        '$label: ${_formatRupiah(rod.toY)}',
+                                        const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Stok Kritis",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                provider.criticalStock.isEmpty
+                    ? const Center(child: Text("Tidak ada stok kritis"))
+                    : SizedBox(
+                  height: 200,
+                  child: ListView.builder(
+                    itemCount: provider.criticalStock.length,
+                    itemBuilder: (context, index) {
+                      final item = provider.criticalStock[index];
+                      return ListTile(
+                        title: Text(item.name ?? ''),
+                        subtitle: Text(
+                          "Sisa: ${item.quantity ?? 0} ${item.stockPrediction != null ? '- ${item.stockPrediction}' : ''}",
+                        ),
+                        trailing: const Icon(
+                          Icons.warning,
+                          color: Colors.red,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
         );
       },
     );

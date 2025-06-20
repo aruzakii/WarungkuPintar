@@ -11,12 +11,13 @@ class InventoryProvider with ChangeNotifier {
   final List<Item> _items = [];
   final List<Sale> _sales = [];
   final FirestoreService _firestoreService = FirestoreService();
-
+  double _todayProfit = 0.0; // Add variable for today's profit
   List<Item> get items => _items;
 
   List<Sale> get sales => _sales;
 
   double get todaySales => _calculateTodaySales();
+  double get todayProfit => _todayProfit; // Getter for today's profit
 
   List<Item> get criticalStock =>
       _items.where((item) => (item.quantity ?? 0) <= 5).toList();
@@ -155,6 +156,7 @@ class InventoryProvider with ChangeNotifier {
         }).toList();
         _items.clear();
         _items.addAll(updatedItems);
+        _todayProfit = _calculateTodayProfit(); // Tambahkan pembaruan ini
         notifyListeners();
       }, onError: (error) {
         debugPrint('Error loading sales: $error');
@@ -171,6 +173,30 @@ class InventoryProvider with ChangeNotifier {
         sale.date!.month == now.month &&
         sale.date!.year == now.year)
         .fold(0, (total, sale) => total + (sale.totalPrice ?? 0));
+  }
+
+  double _calculateTodayProfit() {
+    final now = DateTime.now();
+    return _sales
+        .where(
+          (sale) =>
+      sale.date != null &&
+          sale.date!.day == now.day &&
+          sale.date!.month == now.month &&
+          sale.date!.year == now.year,
+    )
+        .fold(0, (total, sale) => total + calculateSaleProfit(sale));
+  }
+
+  double calculateSaleProfit(Sale sale) {
+    if (sale.itemName == null || sale.quantitySold == null) return 0.0;
+    final item = _items.firstWhere(
+          (i) => i.name == sale.itemName,
+      orElse: () => Item(),
+    );
+    final sellPrice = item.sellPrice ?? 0.0;
+    final buyPrice = item.buyPrice ?? 0.0;
+    return (sellPrice - buyPrice) * (sale.quantitySold ?? 0);
   }
 
   Future<void> addSale(

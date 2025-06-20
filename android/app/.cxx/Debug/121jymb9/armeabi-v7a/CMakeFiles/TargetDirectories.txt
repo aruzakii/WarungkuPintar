@@ -1,0 +1,2 @@
+/Users/fahrel/Skripsi/WarungkuPintar/android/app/.cxx/Debug/121jymb9/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/fahrel/Skripsi/WarungkuPintar/android/app/.cxx/Debug/121jymb9/armeabi-v7a/CMakeFiles/rebuild_cache.dir

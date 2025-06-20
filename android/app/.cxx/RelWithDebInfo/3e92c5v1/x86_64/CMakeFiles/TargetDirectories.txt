@@ -1,0 +1,2 @@
+/Users/fahrel/semester8/Skripsi/WarungkuPintar/android/app/.cxx/RelWithDebInfo/3e92c5v1/x86_64/CMakeFiles/edit_cache.dir
+/Users/fahrel/semester8/Skripsi/WarungkuPintar/android/app/.cxx/RelWithDebInfo/3e92c5v1/x86_64/CMakeFiles/rebuild_cache.dir
