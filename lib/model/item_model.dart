@@ -1,4 +1,5 @@
-// lib/model/item_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Item {
   final String? docId;
   final String? name;
@@ -8,7 +9,8 @@ class Item {
   final String? barcode;
   final String? category;
   final String? stockPrediction;
-  final String? unit; // Tambah field buat satuan (contoh: "Liter (L)", "Kilogram (kg)", "Pcs/Buah")
+  final String? userId; // Pastikan field userId ada
+  final String? unit; // Satuan (contoh: "Liter (L)", "Kilogram (kg)", "Pcs/Buah")
   // final String? barcodePath;
 
   Item({
@@ -20,7 +22,8 @@ class Item {
     this.barcode,
     this.category,
     this.stockPrediction,
-    this.unit, // Tambah parameter unit
+    this.userId,
+    this.unit,
     // this.barcodePath,
   });
 
@@ -34,6 +37,7 @@ class Item {
       'category': category ?? 'lainnya',
       'stock_prediction': stockPrediction,
       'unit': unit ?? 'Pcs/Buah', // Default ke "Pcs/Buah" kalau null
+      'userId': userId, // Tambahkan userId ke map
       // 'barcode_path': barcodePath,
     };
   }
@@ -49,6 +53,7 @@ class Item {
       category: map['category'] as String?,
       stockPrediction: map['stock_prediction'] as String?,
       unit: map['unit'] as String?, // Ambil satuan dari Firestore
+      userId: map['userId'] as String?, // Ambil userId dari Firestore
       // barcodePath: map['barcode_path'] as String?,
     );
   }

@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart'; // Opsional, buat animasi loading
 import 'login_screen.dart';
 import 'main_screen.dart'; // Impor MainScreen buat navigasi
 import 'package:confetti/confetti.dart'; // Opsional, buat efek particle
+import 'package:cloud_firestore/cloud_firestore.dart'; // Impor Firestore
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -24,21 +25,18 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isLoading = false;
   late AnimationController _animationController;
   late Animation<double> _animation;
-  late ConfettiController _confettiController; // Buat efek particle
+  late ConfettiController _confettiController;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration:
-          const Duration(milliseconds: 500), // Kurangin durasi buat performa
+      duration: const Duration(milliseconds: 500),
     );
-    _animation =
-        CurvedAnimation(parent: _animationController, curve: Curves.easeIn);
+    _animation = CurvedAnimation(parent: _animationController, curve: Curves.easeIn);
     _animationController.forward();
-    _confettiController = ConfettiController(
-        duration: const Duration(seconds: 2)); // Inisialisasi particle
+    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
   }
 
   @override
@@ -58,28 +56,31 @@ class _RegisterScreenState extends State<RegisterScreen>
         _isLoading = true;
       });
       try {
-        final userCredential =
-            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+        // Simpan data ke koleksi 'users' di Firestore
+        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+          'email': _emailController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+          // Tambahkan field lain jika perlu, misalnya nama atau status
+        });
         // Simpan user.uid sebagai token di SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('auth_token', userCredential.user!.uid);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registrasi berhasil! Selamat Datang',
-                textAlign: TextAlign.center),
+            content: Text('Registrasi berhasil! Selamat Datang', textAlign: TextAlign.center),
             backgroundColor: Colors.green,
           ),
         );
-        _confettiController.play(); // Efek particle saat sukses
-        await Future.delayed(const Duration(seconds: 2)); // Tunggu efek
-        // Navigasi ke MainScreen tanpa arrow back, reset stack navigasi
+        _confettiController.play();
+        await Future.delayed(const Duration(seconds: 2));
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const MainScreen()),
-          (Route<dynamic> route) => false, // Remove semua route sebelumnya
+              (Route<dynamic> route) => false,
         );
       } on FirebaseAuthException catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -100,7 +101,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      // Menyesuaikan layout saat keyboard muncul
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
@@ -109,26 +109,20 @@ class _RegisterScreenState extends State<RegisterScreen>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFFFCA28), // Kuning
-                  Color(0xFF4CAF50), // Hijau
-                ],
+                colors: [Color(0xFFFFCA28), Color(0xFF4CAF50)],
               ),
             ),
             child: SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    minHeight: MediaQuery.of(context).size.height -
-                        32, // Sesuain dengan padding
+                    minHeight: MediaQuery.of(context).size.height - 32,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       const SizedBox(height: 60),
-                      // Logo kecil, bulat, dengan animasi fade-in
                       FadeTransition(
                         opacity: _animation,
                         child: ClipRRect(
@@ -142,8 +136,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                               return const CircleAvatar(
                                 radius: 50,
                                 backgroundColor: Colors.black,
-                                child: Icon(Icons.store,
-                                    size: 50, color: Colors.white),
+                                child: Icon(Icons.store, size: 50, color: Colors.white),
                               );
                             },
                           ),
@@ -166,7 +159,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Form register dengan card
                       Card(
                         elevation: 4,
                         shape: RoundedRectangleBorder(
@@ -179,13 +171,11 @@ class _RegisterScreenState extends State<RegisterScreen>
                         color: Colors.white.withOpacity(0.9),
                         child: Padding(
                           padding: const EdgeInsets.all(20.0),
-                          // Kurangin padding buat performa
                           child: Form(
                             key: _formKey,
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Email
                                 FadeTransition(
                                   opacity: _animation,
                                   child: TextFormField(
@@ -195,11 +185,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      prefixIcon: const Icon(Icons.email,
-                                          color: Colors.green),
+                                      prefixIcon: const Icon(Icons.email, color: Colors.green),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
-                                            color: Colors.green, width: 2),
+                                        borderSide: const BorderSide(color: Colors.green, width: 2),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       fillColor: Colors.grey[100],
@@ -208,16 +196,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     keyboardType: TextInputType.emailAddress,
                                     validator: (value) => value!.isEmpty
                                         ? 'Email wajib diisi'
-                                        : !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                                .hasMatch(value)
-                                            ? 'Email tidak valid'
-                                            : null,
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.black),
+                                        : !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)
+                                        ? 'Email tidak valid'
+                                        : null,
+                                    style: GoogleFonts.poppins(color: Colors.black),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                // Password
                                 FadeTransition(
                                   opacity: _animation,
                                   child: TextFormField(
@@ -227,11 +212,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      prefixIcon: const Icon(Icons.lock,
-                                          color: Colors.green),
+                                      prefixIcon: const Icon(Icons.lock, color: Colors.green),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
-                                            color: Colors.green, width: 2),
+                                        borderSide: const BorderSide(color: Colors.green, width: 2),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       fillColor: Colors.grey[100],
@@ -241,14 +224,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     validator: (value) => value!.isEmpty
                                         ? 'Password wajib diisi'
                                         : value.length < 6
-                                            ? 'Password minimal 6 karakter'
-                                            : null,
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.black),
+                                        ? 'Password minimal 6 karakter'
+                                        : null,
+                                    style: GoogleFonts.poppins(color: Colors.black),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                // Konfirmasi Password
                                 FadeTransition(
                                   opacity: _animation,
                                   child: TextFormField(
@@ -258,11 +239,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      prefixIcon: const Icon(Icons.lock,
-                                          color: Colors.green),
+                                      prefixIcon: const Icon(Icons.lock, color: Colors.green),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
-                                            color: Colors.green, width: 2),
+                                        borderSide: const BorderSide(color: Colors.green, width: 2),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       fillColor: Colors.grey[100],
@@ -272,70 +251,56 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     validator: (value) => value!.isEmpty
                                         ? 'Konfirmasi password wajib diisi'
                                         : value != _passwordController.text
-                                            ? 'Password tidak cocok'
-                                            : null,
-                                    style: GoogleFonts.poppins(
-                                        color: Colors.black),
+                                        ? 'Password tidak cocok'
+                                        : null,
+                                    style: GoogleFonts.poppins(color: Colors.black),
                                   ),
                                 ),
                                 const SizedBox(height: 24),
                                 _isLoading
                                     ? Lottie.asset(
-                                        'assets/loading.json',
-                                        width: 100,
-                                        height: 100,
-                                        fit: BoxFit.cover,
-                                      ) // Ganti Lottie dengan CircularProgressIndicator buat performa
+                                  'assets/loading.json',
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                )
                                     : ElevatedButton(
-                                        onPressed: _register,
-                                        style: ElevatedButton.styleFrom(
-                                          minimumSize:
-                                              const Size(double.infinity, 50),
-                                          backgroundColor: Colors.yellow,
-                                          foregroundColor: Colors.black,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                          elevation: 4,
-                                          animationDuration:
-                                              const Duration(milliseconds: 200),
-                                        ).merge(
-                                          ButtonStyle(
-                                            overlayColor:
-                                                MaterialStateProperty.all(Colors
-                                                    .green
-                                                    .withOpacity(0.2)),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Daftar',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
+                                  onPressed: _register,
+                                  style: ElevatedButton.styleFrom(
+                                    minimumSize: const Size(double.infinity, 50),
+                                    backgroundColor: Colors.yellow,
+                                    foregroundColor: Colors.black,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 4,
+                                    animationDuration: const Duration(milliseconds: 200),
+                                  ).merge(
+                                    ButtonStyle(
+                                      overlayColor: MaterialStateProperty.all(Colors.green.withOpacity(0.2)),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Daftar',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(height: 16),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.push(
                                       context,
                                       PageRouteBuilder(
-                                        pageBuilder: (context, animation,
-                                                secondaryAnimation) =>
-                                            const LoginScreen(),
-                                        transitionsBuilder: (context, animation,
-                                            secondaryAnimation, child) {
-                                          const begin =
-                                              Offset(-1.0, 0.0); // Dari kiri
+                                        pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                          const begin = Offset(-1.0, 0.0);
                                           const end = Offset.zero;
                                           const curve = Curves.easeInOut;
-                                          var tween = Tween(
-                                                  begin: begin, end: end)
-                                              .chain(CurveTween(curve: curve));
-                                          var offsetAnimation =
-                                              animation.drive(tween);
+                                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                                          var offsetAnimation = animation.drive(tween);
                                           return SlideTransition(
                                             position: offsetAnimation,
                                             child: child,
@@ -364,16 +329,13 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
             ),
           ),
-          // Efek particle (opsional)
-          if (_isLoading ||
-              _confettiController.state == ConfettiControllerState.playing)
+          if (_isLoading || _confettiController.state == ConfettiControllerState.playing)
             ConfettiWidget(
               confettiController: _confettiController,
               blastDirectionality: BlastDirectionality.explosive,
               particleDrag: 0.05,
               emissionFrequency: 0.05,
               numberOfParticles: 10,
-              // Kurangin buat performa
               gravity: 0.05,
               colors: const [Colors.yellow, Colors.green],
             ),

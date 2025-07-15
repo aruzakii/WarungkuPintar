@@ -4,8 +4,12 @@ import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:excel/excel.dart';
+import 'package:file_saver/file_saver.dart';
 import '../provider/inventory_provider.dart';
 import '../model/item_model.dart';
+import '../model/sale_model.dart';
+import 'dart:typed_data';
 
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
@@ -25,7 +29,6 @@ class _SalesScreenState extends State<SalesScreen> {
   @override
   void initState() {
     super.initState();
-    // Pastikan data item dan penjualan dimuat
     final provider = Provider.of<InventoryProvider>(context, listen: false);
     provider.loadItems();
     provider.loadSales();
@@ -36,7 +39,7 @@ class _SalesScreenState extends State<SalesScreen> {
     try {
       final result = await BarcodeScanner.scan(
         options: ScanOptions(
-          restrictFormat: [BarcodeFormat.qr], // Fokus ke QR Code
+          restrictFormat: [BarcodeFormat.qr],
         ),
       );
       debugPrint('Barcode yang discan: ${result.rawContent}');
@@ -44,15 +47,13 @@ class _SalesScreenState extends State<SalesScreen> {
         _scanResult = result.rawContent;
         final provider = Provider.of<InventoryProvider>(context, listen: false);
         debugPrint(
-            'Daftar barcode: ${provider.items.map((item) => item.barcode)
-                .toList()}');
+            'Daftar barcode: ${provider.items.map((item) => item.barcode).toList()}');
         final matchedItem = provider.items.firstWhere(
               (item) => item.barcode == _scanResult,
           orElse: () => Item(name: null, quantity: 0),
         );
         if (matchedItem.name == null) {
-          _scanResult =
-          'Item tidak ditemukan. Scan QR Code kustom dari aplikasi.';
+          _scanResult = 'Item tidak ditemukan. Scan QR Code kustom dari aplikasi.';
           _selectedItemName = null;
         } else {
           _selectedItemName = matchedItem.name;
@@ -83,10 +84,8 @@ class _SalesScreenState extends State<SalesScreen> {
           orElse: () => throw Exception('Item tidak ditemukan'),
         );
 
-        if (selectedItem.quantity == null ||
-            selectedItem.quantity! < _quantitySold) {
-          throw Exception(
-              'Stok tidak cukup! Sisa stok: ${selectedItem.quantity ?? 0}');
+        if (selectedItem.quantity == null || selectedItem.quantity! < _quantitySold) {
+          throw Exception('Stok tidak cukup! Sisa stok: ${selectedItem.quantity ?? 0}');
         }
 
         final totalPrice = (selectedItem.sellPrice ?? 0) * _quantitySold;
@@ -107,6 +106,62 @@ class _SalesScreenState extends State<SalesScreen> {
       } finally {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _downloadSalesReport(InventoryProvider provider) async {
+    setState(() => _isLoading = true);
+    try {
+      var excel = Excel.createExcel();
+      Sheet sheet = excel['Laporan Penjualan'];
+
+      sheet.appendRow([
+        TextCellValue('No'),
+        TextCellValue('Nama Item'),
+        TextCellValue('Jumlah Terjual'),
+        TextCellValue('Harga Jual'),
+        TextCellValue('Total Harga'),
+        TextCellValue('Tanggal'),
+      ]);
+
+      for (int i = 0; i < provider.sales.length; i++) {
+        final sale = provider.sales[i];
+        final item = provider.items.firstWhere(
+              (item) => item.name == sale.itemName,
+          orElse: () => Item(sellPrice: 0.0),
+        );
+        sheet.appendRow([
+          TextCellValue((i + 1).toString()),
+          TextCellValue(sale.itemName ?? ''),
+          TextCellValue(sale.quantitySold?.toString() ?? '0'),
+          TextCellValue(item.sellPrice?.toStringAsFixed(2) ?? '0.00'),
+          TextCellValue(sale.totalPrice?.toStringAsFixed(2) ?? '0.00'),
+          TextCellValue(sale.date?.toIso8601String().substring(0, 10) ?? ''),
+        ]);
+      }
+
+      final fileBytes = excel.save();
+      if (fileBytes != null) {
+        final now = DateTime.now();
+        final fileName = 'laporan_penjualan_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.xlsx';
+        await FileSaver.instance.saveAs(
+          name: fileName,
+          bytes: Uint8List.fromList(fileBytes),
+          ext: 'xlsx',
+          mimeType: MimeType.microsoftExcel,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Laporan berhasil diunduh sebagai $fileName')),
+        );
+      } else {
+        throw Exception('Gagal menghasilkan file Excel');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saat mengunduh laporan: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -177,28 +232,26 @@ class _SalesScreenState extends State<SalesScreen> {
                             value: _selectedItemName,
                             decoration: InputDecoration(
                               labelText: 'Item',
-                              labelStyle:
-                              GoogleFonts.poppins(color: Colors.grey),
+                              labelStyle: GoogleFonts.poppins(color: Colors.grey),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                const BorderSide(color: Colors.grey),
+                                borderSide: const BorderSide(color: Colors.grey),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                const BorderSide(color: Color(0xFF4CAF50)),
+                                borderSide: const BorderSide(color: Color(0xFF4CAF50)),
                               ),
                             ),
                             items: provider.items
                                 .map((item) => item.name)
-                                .toSet() // Hilangkan duplikat
-                                .map((name) =>
-                                DropdownMenuItem<String>(
-                                  value: name,
-                                  child: Text("${name}",
-                                      style: GoogleFonts.poppins()),
-                                ))
+                                .toSet()
+                                .map((name) => DropdownMenuItem<String>(
+                              value: name,
+                              child: Text(
+                                "${name}",
+                                style: GoogleFonts.poppins(),
+                              ),
+                            ))
                                 .toList(),
                             onChanged: (value) {
                               setState(() {
@@ -206,27 +259,22 @@ class _SalesScreenState extends State<SalesScreen> {
                                 _scanResult = 'Item dipilih: $value';
                               });
                             },
-                            validator: (value) =>
-                            value == null ? 'Pilih item' : null,
-                            hint: Text('Pilih Item',
-                                style: GoogleFonts.poppins()),
+                            validator: (value) => value == null ? 'Pilih item' : null,
+                            hint: Text('Pilih Item', style: GoogleFonts.poppins()),
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
                             initialValue: _quantitySold.toString(),
                             decoration: InputDecoration(
                               labelText: 'Jumlah Terjual',
-                              labelStyle:
-                              GoogleFonts.poppins(color: Colors.grey),
+                              labelStyle: GoogleFonts.poppins(color: Colors.grey),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                const BorderSide(color: Colors.grey),
+                                borderSide: const BorderSide(color: Colors.grey),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                const BorderSide(color: Color(0xFF4CAF50)),
+                                borderSide: const BorderSide(color: Color(0xFF4CAF50)),
                               ),
                             ),
                             keyboardType: TextInputType.number,
@@ -236,42 +284,70 @@ class _SalesScreenState extends State<SalesScreen> {
                               });
                             },
                             validator: (value) =>
-                            value == null || value.isEmpty
-                                ? 'Masukkan jumlah'
-                                : null,
+                            value == null || value.isEmpty ? 'Masukkan jumlah' : null,
                           ),
                           const SizedBox(height: 24),
-                          Center(
-                            child: ElevatedButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => _recordSale(provider),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF4CAF50),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 14, horizontal: 24),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                                elevation: 4,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 12,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              Flexible(
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : () => _recordSale(provider),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4CAF50),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14, horizontal: 24),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                    elevation: 4,
+                                    minimumSize: const Size(140, 48),
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                      : Text(
+                                    'Simpan Penjualan',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
-                              )
-                                  : Text(
-                                'Simpan Penjualan',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              ),
+                              Flexible(
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : () => _downloadSalesReport(provider),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2196F3),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14, horizontal: 24),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                    elevation: 4,
+                                    minimumSize: const Size(140, 48),
+                                  ),
+                                  child: Text(
+                                    'Download Excel',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),

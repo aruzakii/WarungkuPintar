@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,6 +35,7 @@ class InventoryProvider with ChangeNotifier {
       category: category,
       stockPrediction: null,
       unit: unit,
+      userId: user.uid, // Tambahkan userId ke model Item
     );
 
     await _firestoreService.createItem(user.uid, item);
@@ -66,8 +66,8 @@ class InventoryProvider with ChangeNotifier {
         barcode: item.barcode,
         category: item.category,
         stockPrediction: predictStockForItem(item),
-        // Update prediksi stok
         unit: item.unit,
+        userId: item.userId, // Pastikan userId dipertahankan
       );
       _items[index] = updatedItem;
       notifyListeners();
@@ -76,9 +76,8 @@ class InventoryProvider with ChangeNotifier {
 
   Future<Item> _getItemFromFirestore(String userId, Item item) async {
     final query = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
         .collection('inventory')
+        .where('userId', isEqualTo: userId)
         .where('name', isEqualTo: item.name)
         .where('quantity', isEqualTo: item.quantity)
         .where('buy_price', isEqualTo: item.buyPrice)
@@ -116,6 +115,7 @@ class InventoryProvider with ChangeNotifier {
             category: item.category,
             stockPrediction: predictStockForItem(item),
             unit: item.unit,
+            userId: item.userId, // Pastikan userId dimuat
           );
           if (!uniqueItems
               .any((existingItem) => existingItem.docId == updatedItem.docId)) {
@@ -152,11 +152,12 @@ class InventoryProvider with ChangeNotifier {
             category: item.category,
             stockPrediction: predictStockForItem(item),
             unit: item.unit,
+            userId: item.userId, // Pastikan userId dipertahankan
           );
         }).toList();
         _items.clear();
         _items.addAll(updatedItems);
-        _todayProfit = _calculateTodayProfit(); // Tambahkan pembaruan ini
+        _todayProfit = _calculateTodayProfit();
         notifyListeners();
       }, onError: (error) {
         debugPrint('Error loading sales: $error');
@@ -200,7 +201,7 @@ class InventoryProvider with ChangeNotifier {
   }
 
   Future<void> addSale(
-      String itemName, int quantitySold, double totalPrice,String? ownerId) async {
+      String itemName, int quantitySold, double totalPrice, String? ownerId) async {
     final userId = ownerId ?? FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) throw Exception('User not logged in');
 
@@ -209,6 +210,7 @@ class InventoryProvider with ChangeNotifier {
       quantitySold: quantitySold,
       totalPrice: totalPrice,
       date: DateTime.now(),
+      userId: userId, // Tambahkan userId ke model Sale
     );
 
     // Simpan penjualan ke Firestore
@@ -233,8 +235,8 @@ class InventoryProvider with ChangeNotifier {
         barcode: item.barcode,
         category: item.category,
         stockPrediction: predictStockForItem(item),
-        // Update prediksi
         unit: item.unit,
+        userId: item.userId, // Pastikan mempertahankan userId
       );
 
       // Update item di Firestore
@@ -273,6 +275,7 @@ class InventoryProvider with ChangeNotifier {
           category: item.category,
           stockPrediction: predictStockForItem(item),
           unit: item.unit,
+          userId: item.userId, // Pastikan userId dimuat
         );
         if (!uniqueItems
             .any((existingItem) => existingItem.docId == updatedItem.docId)) {
@@ -302,6 +305,7 @@ class InventoryProvider with ChangeNotifier {
           category: item.category,
           stockPrediction: predictStockForItem(item),
           unit: item.unit,
+          userId: item.userId, // Pastikan userId dipertahankan
         );
       }).toList();
       _items.clear();

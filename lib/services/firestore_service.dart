@@ -26,11 +26,10 @@ class FirestoreService {
       category: predictedCategory,
       stockPrediction: null,
       unit: item.unit,
+      userId: userId, // Tambahkan userId ke model Item
     );
 
     final docRef = await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('inventory')
         .add(itemWithCategory.toMap());
 
@@ -47,8 +46,6 @@ class FirestoreService {
     if (item.docId == null) throw Exception('Item ID not found');
 
     await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('inventory')
         .doc(item.docId)
         .update(item.toMap());
@@ -56,8 +53,6 @@ class FirestoreService {
 
   Future<void> deleteItem(String userId, String docId) async {
     await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('inventory')
         .doc(docId)
         .delete();
@@ -65,9 +60,8 @@ class FirestoreService {
 
   Stream<List<Item>> getItems(String userId) {
     return _firestore
-        .collection('users')
-        .doc(userId)
         .collection('inventory')
+        .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) => snapshot.docs
         .map((doc) => Item.fromMap(doc.data(), doc.id))
@@ -76,9 +70,8 @@ class FirestoreService {
 
   Stream<List<Sale>> getSales(String userId) {
     return _firestore
-        .collection('users')
-        .doc(userId)
         .collection('sales')
+        .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) => snapshot.docs
         .map((doc) => Sale.fromMap(doc.data(), doc.id))
@@ -86,22 +79,26 @@ class FirestoreService {
   }
 
   Future<void> createSale(String userId, Sale sale) async {
+    final saleWithUserId = Sale(
+      itemName: sale.itemName,
+      quantitySold: sale.quantitySold,
+      totalPrice: sale.totalPrice,
+      date: sale.date,
+      userId: userId, // Tambahkan userId ke model Sale
+      docId: sale.docId,
+    );
+
     await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('sales')
-        .add(sale.toMap());
+        .add(saleWithUserId.toMap());
   }
 
   Future<void> deleteSale(String userId, String docId) async {
     await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('sales')
         .doc(docId)
         .delete();
   }
-
 
   Future<void> createCashier(Cashier cashier) async {
     await _firestore.collection('cashiers').add(cashier.toMap());
@@ -131,6 +128,4 @@ class FirestoreService {
     }
     return null;
   }
-
-
 }
