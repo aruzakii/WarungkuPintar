@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -172,6 +173,15 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
 
       setState(() => _isLoading = true);
 
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User tidak login')),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final updatedItem = Item(
         docId: widget.item.docId,
         name: _nameController.text,
@@ -182,6 +192,7 @@ class _InventoryDetailScreenState extends State<InventoryDetailScreen> {
         category: _selectedCategory,
         stockPrediction: widget.item.stockPrediction,
         unit: _selectedUnit,
+        userId: user.uid,
       );
 
       try {

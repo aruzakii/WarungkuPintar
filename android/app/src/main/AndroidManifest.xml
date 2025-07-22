@@ -7,7 +7,7 @@
 
     <application
         android:label="WarungkuPintar"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/logo_warungkupintar">
         <activity
             android:name=".MainActivity"
             android:exported="true"
